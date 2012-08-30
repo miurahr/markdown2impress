@@ -15,6 +15,7 @@ my %opts = (
     height     => 800,
     max_column => 5,
     outputdir  => getcwd(),
+    outputpdf  => 0,
 );
 
 GetOptions(
@@ -22,6 +23,7 @@ GetOptions(
     'height=i'    => \$opts{ height },
     'column=i'    => \$opts{ max_column },
     'outputdir=s' => \$opts{ outputdir },
+    'outputpdf'   => \$opts{ outputpdf },
 );
 
 my $SectionRe = qr{(.+[ \t]*\n[-=]+[ \t]*\n*(?:(?!.+[ \t]*\n[-=]+[ \t]*\n*)(?:.|\n))*)};
@@ -43,6 +45,20 @@ my $output = $tx->render_string( $index_html, {
 my $outputfile_fh = file( $outputfile )->open( 'w' ) or die $!;
 print $outputfile_fh $output;
 close $outputfile_fh;
+
+if( $opts{ outputpdf } ) {
+    output_pdf( $content );
+}
+
+sub output_pdf {
+    my $content = shift;
+    my $impress_demo_css = get_data_section( 'impress.css' );
+    my $pdf_css = get_data_section( 'pdf.css' );
+    $content = sprintf('<style>%s%s</style>%s', $impress_demo_css, $pdf_css, $content);
+    require PDF::WebKit;
+    my $kit = PDF::WebKit->new(\$content, page_size => 'Letter', orientation => 'Landscape');
+    my $output_file = $kit->to_file('./impress.pdf');
+}
 
 sub parse_markdown {
     my $md = shift;
@@ -1048,5 +1064,16 @@ body     { pointer-events: none; }
 .impress-not-supported .fallback-message {
     display: block;
 }
+
+@@ pdf.css
+
+div.step {
+    page-break-after: always !important;
+}
+
+.step:not(.active) {
+    opacity: 100;
+}
+
 
 __END__

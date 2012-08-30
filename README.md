@@ -58,3 +58,7 @@ Command line options
 - **--outputdir=.**
 
     Output directory.
+
+- **--outputpdf**
+
+    Output to pdf file.
