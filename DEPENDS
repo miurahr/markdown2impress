@@ -1,0 +1,11 @@
+Markdown2impress.pl need libraries as follows
+
+Text::Markdown
+Text::Xslate
+PDF::WebKit
+
+
+PDF::WebKit depends
+IPC::Run
+Moose
+XML::LibXML
