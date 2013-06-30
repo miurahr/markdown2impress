@@ -9,6 +9,8 @@ use File::Spec;
 use Path::Class;
 use Text::Markdown qw( markdown );
 use Text::Xslate qw( mark_raw );
+use FindBin;
+use lib "$FindBin::Bin/../lib";
 
 my %opts = (
     width      => 1200,
@@ -23,16 +25,30 @@ GetOptions(
     'height=i'    => \$opts{ height },
     'column=i'    => \$opts{ max_column },
     'outputdir=s' => \$opts{ outputdir },
-    'outputpdf'   => \$opts{ outputpdf },
+    'outputpdf=s' => \$opts{ outputpdf },
+    'outputhtml=s' => \$opts{ outputhtml },
+    'staticfilesdir=s' => \$opts{ staticfilesdir },
 );
 
 my $SectionRe = qr{(.+[ \t]*\n[-=]+[ \t]*\n*(?:(?!.+[ \t]*\n[-=]+[ \t]*\n*)(?:.|\n))*)};
 
+unless( $opts{ outputdir }) {
+    $opts { outputdir } = File::Spec->curdir();
+}
 $opts{ outputdir } = File::Spec->canonpath( $opts{ outputdir } );
-output_static_files( $opts{ outputdir } );
+my $staticfilesdir = File::Spec->abs2rel($opts{ outputdir });
+if( $opts{ staticfilesdir }) {
+    $staticfilesdir = File::Spec->canonpath( $opts{ staticfilesdir } );
+}
+output_static_files( $staticfilesdir );
+$staticfilesdir = File::Spec->abs2rel($staticfilesdir, $opts{ outputdir });
 
 my $outputfile = 'index.html';
-$outputfile = File::Spec->catfile( $opts{ outputdir }, $outputfile );
+if( $opts{outputhtml} ) {
+    $outputfile = File::Spec->catfile( $opts{ outputdir }, $opts{ outputhtml });
+} else {
+    $outputfile = File::Spec->catfile( $opts{ outputdir }, $outputfile );
+}
 
 my $mdfile = $ARGV[0] or die;
 my $content = parse_markdown( join '', file( $mdfile )->slurp );
@@ -40,24 +56,26 @@ my $content = parse_markdown( join '', file( $mdfile )->slurp );
 my $index_html = get_data_section( 'index.html' );
 my $tx = Text::Xslate->new;
 my $output = $tx->render_string( $index_html, {
-    content => mark_raw( $content ),
+    content => mark_raw( $content ), staticfilesdir => mark_raw($staticfilesdir.'/'),
 } );
 my $outputfile_fh = file( $outputfile )->open( 'w' ) or die $!;
 print $outputfile_fh $output;
 close $outputfile_fh;
 
 if( $opts{ outputpdf } ) {
-    output_pdf( $content );
+    my $outpdf = File::Spec->catfile( $opts{ outputdir }, $opts{ outputpdf } );
+    output_pdf( $content, $outpdf );
 }
 
 sub output_pdf {
     my $content = shift;
+    my $outfile = shift;
     my $impress_demo_css = get_data_section( 'impress.css' );
     my $pdf_css = get_data_section( 'pdf.css' );
     $content = sprintf('<style>%s%s</style>%s', $impress_demo_css, $pdf_css, $content);
     require PDF::WebKit;
     my $kit = PDF::WebKit->new(\$content, page_size => 'Letter', orientation => 'Landscape');
-    my $output_file = $kit->to_file('./impress.pdf');
+    my $output_file = $kit->to_file($outfile);
 }
 
 sub parse_markdown {
@@ -154,7 +172,7 @@ __DATA__
     <meta charset="utf-8" />
     <title><: $title :></title>
     <link href="http://fonts.googleapis.com/css?family=Open+Sans:regular,semibold,italic,italicsemibold|PT+Sans:400,700,400italic,700italic|PT+Serif:400,700,400italic,700italic" rel="stylesheet" />
-    <link href="css/impress.css" rel="stylesheet" />
+    <link href="<: $staticfilesdir :>css/impress.css" rel="stylesheet" />
 </head>
 <body>
 <div id="impress" class="impress-not-supported">
@@ -178,7 +196,7 @@ if ("ontouchstart" in document.documentElement) {
     document.querySelector(".hint").innerHTML = "<p>Tap on the left or right to navigate</p>";
 }
 </script>
-<script src="js/impress.js"></script>
+<script src="<: $staticfilesdir :>js/impress.js"></script>
 
 </body>
 </html>
